@@ -31,6 +31,9 @@ import org.eclipse.swt.widgets.TabFolder;
 import org.eclipse.swt.widgets.TabItem;
 import org.eclipse.swt.widgets.Text;
 
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+
 public class Note extends Thread{ 
 	public static final String BULLET_STRING = "" + (char)126;
 	public static final String CONTROL_CHARS = " 0123456789!@#$%^&*()~`-_=+[]{}\\|\"\r\n\t;:?/,.<>";
@@ -50,13 +53,13 @@ public class Note extends Thread{
 	private ArrayList<String> wordsNotInDict = new ArrayList<String>();
 
 	/**
-	 * Constructor for a note that is from an existing file. You <b><u>MUST</b></u> call the run method of this object in order to read the file and add dictionary items.
+	 * Constructor for a note that is from an existing file. You <b><u>MUST</b></u> call the start method of this object in order to read the file and add dictionary items.
 	 * @param fileName The string representing the full file name of this note
 	 * @param ti The TabItem on the UI
 	 * @param tf The TabFolder on the UI
 	 * @throws IOException This will throw an IOException if there is an error in creating the FileReader, BufferedReader, or if there is an issue decoding the file.
 	 */
-	public Note(String fileName, TabItem ti, TabFolder tf) throws IOException{
+	public Note(String fileName, Tab ti, TabPane tf) throws IOException{
 		System.out.println("Log: " + fileName + " file opened @" + new Date().toString());
 		this.totLength = new File(fileName).length();
 		this.currentRead = 0L;
@@ -207,7 +210,7 @@ public class Note extends Thread{
 	 * @param ti The TabItem on the UI
 	 * @param tf The TabFolder on the UI
 	 */
-	public Note(TabItem ti, TabFolder tf){
+	public Note(Tab ti, TabPane tf){
 		System.out.println("Log: new note started @" + new Date().toString());
 		this.setName("New note thread");
 		this.ti = ti;
@@ -660,6 +663,11 @@ public class Note extends Thread{
 			s += st.getStatus();
 		}
 		return s;
+	}
+	
+	public boolean needsSaved(){
+		//TODO
+		return false;
 	}
 	/**
 	 * Finds the words and highlights occurences in green. This uses a UI so only call from UI thread.

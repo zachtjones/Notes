@@ -116,7 +116,9 @@ public class Definition {
 	 * @param display The display that is for this program.
 	 * @param shell Only used to set the location of this new window to the same as the other window. Must not be null
 	 */
-	static void defineWord(Display display, Shell shell){
+	static void defineWord(){
+		//TODO create an alert instead
+		
 		final Shell newShell = new Shell(display);
 		newShell.setSize(600, 400);
 		newShell.setText("Define a word");
@@ -257,7 +259,7 @@ public class Definition {
 	 * the contents of the files (no extra stuff added) the length devoted to each definition is the number at the header
 	 * @param parent The parent shell to show both the FileDailog and MessageBox over
 	 */
-	static void createDefArchive(Shell parent){
+	static void createDefArchive(){
 		FileDialog fd = new FileDialog(parent, SWT.SAVE);
 		String[] temp1 = {"*.defnar"};
 		String[] temp2 = {"Definitions Archive file (*.defnar)"};
@@ -271,7 +273,7 @@ public class Definition {
 	 * Creates the definitions from the archive file
 	 * @param parent The
 	 */
-	static void loadArchive(Shell parent){
+	static void loadArchive(){
 		FileDialog fd = new FileDialog(parent, SWT.OPEN);
 		String[] temp1 = {"*.defnar"};
 		String[] temp2 = {"Definitions Archive file (*.defnar)"};

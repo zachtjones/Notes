@@ -2,366 +2,263 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+import java.util.Optional;
 
-import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ControlEvent;
-import org.eclipse.swt.events.ControlListener;
-import org.eclipse.swt.events.DisposeEvent;
-import org.eclipse.swt.events.DisposeListener;
-import org.eclipse.swt.events.KeyEvent;
-import org.eclipse.swt.events.KeyListener;
-import org.eclipse.swt.events.MouseEvent;
-import org.eclipse.swt.events.MouseListener;
-import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.events.SelectionListener;
-import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.FileDialog;
-import org.eclipse.swt.widgets.Label;
-import org.eclipse.swt.widgets.Menu;
-import org.eclipse.swt.widgets.MenuItem;
-import org.eclipse.swt.widgets.MessageBox;
-import org.eclipse.swt.widgets.Shell;
-import org.eclipse.swt.widgets.TabFolder;
-import org.eclipse.swt.widgets.TabItem;
+import javafx.application.Application;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.scene.input.MouseButton;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Label;
+import javafx.scene.control.Menu;
+import javafx.stage.FileChooser;
+import javafx.stage.FileChooser.ExtensionFilter;
+import javafx.stage.Stage;
 
-public class NotesMain {
+public class NotesMain extends Application {
+	/** This is the list of notes that are open */
+	private ArrayList<Note> notes = new ArrayList<Note>();
+	/** This is the tab pane that has the tabs for the individual notes*/
+	private TabPane tabs;
+	/** This is the label that displays the message at the bottom*/
+	private Label lblBottom;
 
-	private static ArrayList<Note> notes = new ArrayList<Note>();
-	private static Display display;
-	private static Shell shell;
-	private static Menu menu, fileMenu, tabMenu, editMenu, defMenu;
-	private static MenuItem fileMenuHeader, fileMenuOpen, fileMenuSave, fileMenuSaveAs, fileMenuClose, fileMenuCloseAll, tabMenuClose;
-	private static MenuItem editMenuHeader, editMenuCheckSpelling, editMenuFind, editMenuReplace;
-	private static MenuItem definitionsHeader, defMenuDefine, defMenuCreateArchive, defMenuLoadArchive;
-	private static TabFolder tabFolder;
-	private static TabItem tiNew;
-	private static Label lblBottom;
 	public static final String base = thisBaseDir();
 	public final static String defDir = base + "definitions" + File.separator;
-	
+
 	public static void main(String[] args) {
 		System.out.println("Log: Notes process started in main (UI thread) @ " + new Date().toString());
 		System.out.println("Log: Base directory : " + base);
 		System.out.println("Log: Definitions directory : " + defDir);
 		System.out.println("Closing this command line window will terminate this process immediately and can cause you to lose unsaved progress");
+
+		Application.launch(args);
 		//TODO
 		/*
 		Add more options with the dictionary (change local definitions, add user-defined definitions)
 		Add the ability to add names to dictionary
 		add the option to export/import definitions to/from 1 file
-		
-			
+
+
 		keep a recents list
 		if a tab is still open when the application shuts down, re-open it (if the filename is available) when the application starts
-		
+
 		Add more edit options to find, find & replace -use parameters like whole words only, case sensitive, current selection/current document/all open documents
 			-also add the option to iterate (only go one occurrence at a time) - add the required buttons to the existing UI
 			-for the not case sensitive-make a string = txt.getText() and set that and the find string to lower
 
 		 */
-		Display.setAppName("Notes");
-		display = new Display();
-		shell = new Shell(display);
-		shell.setText("ZJ Notes");
-		shell.setSize(800, 600);
-		
-		menu = new Menu(shell, SWT.BAR);
 
-		fileMenu = new Menu(menu);
-		fileMenuHeader = new MenuItem(menu, SWT.CASCADE);
-	    fileMenuHeader.setText("&File");
-		fileMenuHeader.setMenu(fileMenu);
-		
-		editMenu = new Menu(menu);
-		editMenuHeader = new MenuItem(menu, SWT.CASCADE);
-		editMenuHeader.setText("&Edit");
-		editMenuHeader.setMenu(editMenu);
-		
-		defMenu = new Menu(menu);
-		definitionsHeader = new MenuItem(menu, SWT.CASCADE);
-		definitionsHeader.setText("&Definitions");
-		definitionsHeader.setMenu(defMenu);
-		
-		defMenuDefine = new MenuItem(defMenu, SWT.PUSH);
-		defMenuDefine.setText("&Define");
-		defMenuDefine.addSelectionListener(new SelectionListener(){
+		System.out.println("Log: main thread shut down normally @ " + new Date().toString());
+	}
 
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				Definition.defineWord(display, shell);
-			}
+	@Override
+	public void start(Stage primaryStage) throws Exception {
+		// TODO make this MVC behavior
+		MenuBar menu = new MenuBar();
 
-			@Override
-			public void widgetDefaultSelected(SelectionEvent e) {
-				//not called
-			}
+		//file menu
+		Menu fileMenu = new Menu("File");
+		
+		//file new
+		MenuItem fileMenuNew = new MenuItem("New");
+		fileMenuNew.setOnAction(event -> {
+			FileChooser fd = new FileChooser();
+			fd.setTitle("Select the file(s) to open");
+			fd.getExtensionFilters().add(new ExtensionFilter("Any file (*.*)", "*.*"));
+			File file = fd.showSaveDialog(primaryStage);
 			
-		});
-		
-		defMenuCreateArchive = new MenuItem(defMenu, SWT.PUSH);
-		defMenuCreateArchive.setText("&Create archive");
-		defMenuCreateArchive.addSelectionListener(new SelectionListener(){
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				Definition.createDefArchive(shell);
+			if(file == null){
+				return; //cancel was clicked
 			}
-			@Override
-			public void widgetDefaultSelected(SelectionEvent e) {
-				//not called
+			try {
+				file.createNewFile();
+				Tab tempTI = new Tab(file.getName());
+				Note tempNote = new Note(file.getAbsolutePath(), tempTI, tabs);
+				tempNote.start();
+				notes.add(tempNote);
+				tabs.getTabs().add(tempTI);
+			} catch (IOException e1) {
+				Alert a = new Alert(AlertType.ERROR);
+				a.setContentText("There was an issue creating file: " 
+						+ file.getAbsolutePath() + ".\n" + e1.getMessage());
+				a.setTitle("Error");
+				a.showAndWait();
 			}
-		});
-		
-		defMenuLoadArchive = new MenuItem(defMenu, SWT.PUSH);
-		defMenuLoadArchive.setText("&Load archive");
-		defMenuLoadArchive.addSelectionListener(new SelectionListener(){
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				Definition.loadArchive(shell);
-			}
-			@Override
-			public void widgetDefaultSelected(SelectionEvent e) {
-				//not called
-			}
-		});
-		
-		editMenuCheckSpelling = new MenuItem(editMenu, SWT.PUSH);
-		editMenuCheckSpelling.setText("Ch&eck spelling");
-		editMenuCheckSpelling.addSelectionListener(new SelectionListener() {
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				int temp = tabFolder.getSelectionIndex();
-				if(temp == 0 || temp == -1){return;}
-				notes.get(temp-1).checkSpelling();
-			}
-			@Override
-			public void widgetDefaultSelected(SelectionEvent e) {
-				//not called
-			}
-		});
-		
-		editMenuFind = new MenuItem(editMenu, SWT.PUSH);
-		editMenuFind.setText("&Find");
-		editMenuFind.addSelectionListener(new SelectionListener(){
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				int temp = tabFolder.getSelectionIndex();
-				if(temp == 0 || temp == -1){return;}
-				notes.get(temp-1).findWords();
-			}
-			@Override
-			public void widgetDefaultSelected(SelectionEvent e) {
-				//not called
-			}
-		});
-		
-		editMenuReplace = new MenuItem(editMenu, SWT.PUSH);
-		editMenuReplace.setText("&Replace");
-		editMenuReplace.addSelectionListener(new SelectionListener(){
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				int temp = tabFolder.getSelectionIndex();
-				if(temp == 0 || temp == -1){return;}
-				notes.get(temp-1).findReplace();
-			}
-			@Override
-			public void widgetDefaultSelected(SelectionEvent e) {
-				//not called
-			}
-		});
-		
-		fileMenuOpen = new MenuItem(fileMenu, SWT.PUSH);
-		fileMenuOpen.setText("&Open");
-		fileMenuOpen.addSelectionListener(new SelectionListener(){
 
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				FileDialog fd = new FileDialog(shell, SWT.OPEN | SWT.MULTI);
-				fd.setText("Select the file(s) to open");
-				String[] temp = {"All files (*.*)"};
-				String[] temp2 = {"*.*"};
-				fd.setFilterExtensions(temp2);
-				fd.setFilterNames(temp);
-				fd.open();
-				String[] allSelectedFiles = fd.getFileNames();
-				if(allSelectedFiles.length == 0){
-					return; //none were selected, so there is no need to prompt the user
-				}
-				for(String fn : allSelectedFiles){
-					try {
-						TabItem tempTI = new TabItem(tabFolder, SWT.NONE);
-						Note tempNote = new Note(fd.getFilterPath() + File.separator + fn, tempTI, tabFolder);
-						tempNote.start();
-						notes.add(tempNote);
-						tempTI.setText(fn);//setStyledText will clear the StyledText
-					} catch (IOException e1) {
-						MessageBox mb = new MessageBox(shell, SWT.OK);
-						mb.setMessage("There was an issue opening file: " + fn + ".\n" + e1.getMessage());
-						mb.setText("Error");
-						mb.open();
-					}	
+		});
+		fileMenu.getItems().add(fileMenuNew);
+
+		//file open
+		MenuItem fileMenuOpen = new MenuItem("Open");
+		fileMenuOpen.setOnAction(event -> {
+			FileChooser fd = new FileChooser();
+			fd.setTitle("Select the file(s) to open");
+			fd.getExtensionFilters().add(new ExtensionFilter("Any file (*.*)", "*.*"));
+			List<File> files = fd.showOpenMultipleDialog(primaryStage);
+
+			if(files == null){
+				return; //none were selected
+			}
+			for(File fn : files){
+				try {
+					Tab tempTI = new Tab(fn.getName());
+					Note tempNote = new Note(fn.getAbsolutePath(), tempTI, tabs);
+					tempNote.start();
+					notes.add(tempNote);
+				} catch (IOException e1) {
+					Alert a = new Alert(AlertType.ERROR);
+					a.setContentText("There was an issue opening file: " + fn + ".\n" + e1.getMessage());
+					a.setTitle("Error");
+					a.showAndWait();
 				}
 			}
-
-			@Override
-			public void widgetDefaultSelected(SelectionEvent e) {
-				//not called
-			}
-			
 		});
-		
-		fileMenuSave = new MenuItem(fileMenu, SWT.PUSH);
-		fileMenuSave.setText("&Save");
-		fileMenuSave.addSelectionListener(new SelectionListener(){
+		fileMenu.getItems().add(fileMenuOpen);
 
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				//save the current thing
-				int temp = tabFolder.getSelectionIndex();
-				if(temp == 0 || temp == -1){return;}
-				notes.get(temp-1).save();
-			}
-
-			@Override
-			public void widgetDefaultSelected(SelectionEvent e) {
-				// not called
-			}
-			
+		//file save
+		MenuItem fileMenuSave = new MenuItem("Save");
+		fileMenuSave.setOnAction(event -> {
+			//save the current note
+			int temp = tabs.getSelectionModel().getSelectedIndex();
+			if(temp == -1){return;}
+			notes.get(temp).save();
 		});
-		fileMenuSaveAs = new MenuItem(fileMenu, SWT.PUSH);
-		fileMenuSaveAs.setText("Save As");
-		fileMenuSaveAs.addSelectionListener(new SelectionListener(){
+		fileMenu.getItems().add(fileMenuSave);
 
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				//save the current thing
-				int temp = tabFolder.getSelectionIndex();
-				if(temp == 0 || temp == -1){return;}
-				notes.get(temp-1).saveAs();
-			}
-
-			@Override
-			public void widgetDefaultSelected(SelectionEvent e) {
-				// not called
-			}
+		//file save as
+		MenuItem fileMenuSaveAs = new MenuItem("Save As");
+		fileMenuSaveAs.setOnAction(event -> {
+			//save the current note
+			int temp = tabs.getSelectionModel().getSelectedIndex();
+			if(temp == -1){return;}
+			notes.get(temp).saveAs();
 		});
 
-		SelectionListener closeL = new SelectionListener(){
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				if(tabFolder.getSelection()[0].equals(tiNew)){
-					//do nothing
-				} else {
-					//close it
-					TabItem tempTI = tabFolder.getSelection()[0];
-					for(int i = 0; i < notes.size(); i++){
-						if(notes.get(i).getTabItem().equals(tempTI)){
-							if(tempTI.getText().contains("*")){
-								MessageBox mb = new MessageBox(shell, SWT.YES | SWT.NO);
-								mb.setText("Save");
-								mb.setMessage("Do you want to save changes to: " + tempTI.getText().replace("*", "") + "?");
-								int result = mb.open();
-								if(result == SWT.YES){
-									notes.get(i).save();
-									notes.remove(i);
-									tempTI.dispose();
-									break;//exit the for loop
-								} else if(result == SWT.NO){
-									notes.remove(i);
-									tempTI.dispose();
-									break;//exit the for loop
-								}
-								break;
-							} else { //just close it as no changes are necessary
-								notes.remove(i);
-								tempTI.dispose();
-								break;
-							}
-							
-							
-						}
-					}
-					
+		//file close
+		MenuItem fileMenuClose = new MenuItem("Close");
+		fileMenuClose.setOnAction(event -> {
+			//close the selected tab
+			closeSelected();
+		});
+		fileMenu.getItems().add(fileMenuClose);
 
-				}
-			}
-
-			@Override
-			public void widgetDefaultSelected(SelectionEvent e) {
-				//not called
-			}
-		};
-		fileMenuClose = new MenuItem(fileMenu, SWT.PUSH);
-		fileMenuClose.setText("&Close");
-		fileMenuClose.addSelectionListener(closeL);
-		
-		final SelectionListener closeAllListener = new SelectionListener(){
-
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				for(Note n : notes){
-					if(n.getTabItem().getText().contains("*")){
-						MessageBox mb = new MessageBox(shell, SWT.YES | SWT.NO);
-						mb.setText("Save");
-						mb.setMessage("Do you want to save changes to: " + n.getTabItem().getText().replace("*", "") + "?");
-						if(mb.open() == SWT.YES){
-							n.save();
-						}
-					}
-				}
-				
-				notes.removeAll(notes);
-				for(TabItem ti : tabFolder.getItems()){
-					if(!ti.equals(tiNew)){
-						ti.dispose();
+		MenuItem fileMenuCloseAll = new MenuItem("Close all");
+		fileMenuCloseAll.setOnAction(event -> {
+			for(Note n : notes){
+				//save the note if needed
+				if(n.needsSaved()){
+					Alert a = new Alert(AlertType.NONE, "Do you want to save changes to: "
+							+ n.getName() + "?", ButtonType.YES, ButtonType.NO);
+					Optional<ButtonType> b = a.showAndWait();
+					if(b.isPresent() && b.get().getText().equals("Yes")){
+						n.save();
 					}
 				}
 			}
-
-			@Override
-			public void widgetDefaultSelected(SelectionEvent e) {
-				//not called
-			}
-		};
-		
-		fileMenuCloseAll = new MenuItem(fileMenu, SWT.PUSH);
-		fileMenuCloseAll.setText("Close All");
-		fileMenuCloseAll.addSelectionListener(closeAllListener);
-		
-		shell.addDisposeListener(new DisposeListener(){
-
-			@Override
-			public void widgetDisposed(DisposeEvent e) {
-				closeAllListener.widgetSelected(null);
-			}
-			
+			//remove all notes
+			notes.removeAll(notes);
+			tabs.getTabs().clear();
 		});
 
-		shell.setMenuBar(menu); //set menu is right-click on the control 
+		//edit menu
+		Menu editMenu = new Menu("Edit");
 
-		tabFolder = new TabFolder(shell, SWT.BORDER);
-		tabFolder.setBounds(5, 5, 765, 525);
-
-		tabMenu = new Menu(tabFolder);
-		tabMenuClose = new MenuItem(tabMenu, SWT.PUSH);
-		tabMenuClose.setText("Close");
-		tabMenuClose.addSelectionListener(closeL);
-
-		tabFolder.setMenu(tabMenu);
-		tabFolder.addKeyListener(new KeyListener() {
-
-			@Override
-			public void keyPressed(KeyEvent e) {
-				e.doit = false;
-			}
-
-			@Override
-			public void keyReleased(KeyEvent e) {
-				e.doit = false;
-			}
-
+		//check spelling button
+		MenuItem editMenuCheckSpelling = new MenuItem("Check Spelling");
+		editMenuCheckSpelling.setOnAction(event -> {
+			int temp = tabs.getSelectionModel().getSelectedIndex();
+			if(temp == -1){return;}
+			notes.get(temp).checkSpelling();
 		});
-		tiNew = new TabItem(tabFolder, SWT.NONE);
-		tiNew.setText("+");
+		editMenu.getItems().add(editMenuCheckSpelling);
+
+		//find button
+		MenuItem editMenuFind = new MenuItem("Find");
+		editMenuFind.setOnAction(event -> {
+			int temp = tabs.getSelectionModel().getSelectedIndex();
+			if(temp == -1){return;}
+			notes.get(temp).findWords();
+		});
+		editMenu.getItems().add(editMenuFind);
+
+		//replace button
+		MenuItem editMenuReplace = new MenuItem("Replace");
+		editMenuReplace.setOnAction(event -> {
+			int temp = tabs.getSelectionModel().getSelectedIndex();
+			if(temp == -1){return;}
+			notes.get(temp).findReplace();
+		});
+		editMenu.getItems().add(editMenuReplace);
+
+
+		//definitions menu
+		Menu defMenu = new Menu("Definitions");
+
+		//define word
+		MenuItem defMenuDefine = new MenuItem("Define word");
+		defMenuDefine.setOnAction(event -> {
+			//TODO
+			Definition.defineWord();
+		});
+		defMenu.getItems().add(defMenuDefine);
+
+		//create archive
+		MenuItem defMenuCreateArchive = new MenuItem("Create Archive");
+		defMenuCreateArchive.setOnAction(event -> {
+			//TODO
+			Definition.createDefArchive();
+		});
+		defMenu.getItems().add(defMenuCreateArchive);
+
+		//load archive
+		MenuItem defMenuLoadArchive = new MenuItem("Load Archive");
+		defMenuLoadArchive.setOnAction(event -> {
+			//TODO
+			Definition.loadArchive();
+		});
+		defMenu.getItems().add(defMenuLoadArchive);
+
+
+		menu.getMenus().addAll(fileMenu, editMenu, defMenu);
+
+		BorderPane bp = new BorderPane();
+		bp.setTop(menu);
+		
+		//bottom label
+		lblBottom = new Label();
+		bp.setBottom(lblBottom);
+
+		//the close context-menu
+		ContextMenu cm = new ContextMenu();
+		MenuItem close = new MenuItem("Close");
+		close.setOnAction(event -> {
+			closeSelected();
+		});
+		cm.getItems().add(close);
+
+		//the tab pane
+		tabs = new TabPane();
+		tabs.setOnMouseClicked(event -> {
+			if(event.getButton() == MouseButton.SECONDARY){
+				//show close context menu
+				cm.show(primaryStage);
+			}
+		});
+
+		bp.setCenter(tabs);
+
+
+		/*
+
 
 		tabFolder.addMouseListener(new MouseListener() {
 
@@ -432,7 +329,10 @@ public class NotesMain {
 			}
 		}
 		display.dispose();
-		System.out.println("Log: main thread shut down normally @ " + new Date().toString());
+
+		shell = new Shell(display);
+		shell.setText("ZJ Notes");
+		shell.setSize(800, 600);
 	}
 
 	public static String getStatus() {
@@ -450,7 +350,45 @@ public class NotesMain {
 			}
 		}
 		return false;
+		 */
+
+		Scene scene = new Scene(bp);
+		primaryStage.setScene(scene);
+		primaryStage.setTitle("Notes");
+
+		//add the close save prompt
+
+		primaryStage.setOnCloseRequest(event -> {
+			//TODO
+		});
+		primaryStage.show();
+
 	}
+
+	/**
+	 * Closes the selected tab
+	 */
+	private void closeSelected(){
+		// TODO
+		int index = tabs.getSelectionModel().getSelectedIndex();
+		if(index > 1){
+			//get the selected tab
+			Tab temp = tabs.getTabs().get(index);
+			//close it
+			Note n = notes.get(index - 1);
+			if(n.needsSaved()){
+				Alert a = new Alert(AlertType.NONE, "Do you want to save changes to: "
+						+ n.getName() + "?", ButtonType.YES, ButtonType.NO);
+				Optional<ButtonType> b = a.showAndWait();
+				if(b.isPresent() && b.get().getText().equals("Yes")){
+					n.save();
+				}
+			}
+			notes.remove(index - 1);
+			tabs.getTabs().remove(temp);
+		}
+	}
+
 	/**
 	 * Prints to the console how much time has passed since start in milliseconds with the message. <br>
 	 * Use this method commonly for finding the time it takes for methods to run.
@@ -469,8 +407,9 @@ public class NotesMain {
 		try {
 			return new File(new File(".txt").getAbsolutePath()).getParent() + File.separator;
 		} catch (Exception e) {
-			
+
 		}
 		return "";
 	}
+
 }
