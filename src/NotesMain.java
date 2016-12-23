@@ -4,8 +4,11 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Tab;
@@ -62,7 +65,6 @@ public class NotesMain extends Application {
 
 	@Override
 	public void start(Stage primaryStage) throws Exception {
-		// TODO make this MVC behavior
 		MenuBar menu = new MenuBar();
 
 		//file menu
@@ -82,8 +84,7 @@ public class NotesMain extends Application {
 			try {
 				file.createNewFile();
 				Tab tempTI = new Tab(file.getName());
-				Note tempNote = new Note(file.getAbsolutePath(), tempTI, tabs);
-				tempNote.start();
+				Note tempNote = new Note(file, tempTI, tabs, primaryStage);
 				notes.add(tempNote);
 				tabs.getTabs().add(tempTI);
 			} catch (IOException e1) {
@@ -102,7 +103,7 @@ public class NotesMain extends Application {
 		fileMenuOpen.setOnAction(event -> {
 			FileChooser fd = new FileChooser();
 			fd.setTitle("Select the file(s) to open");
-			fd.getExtensionFilters().add(new ExtensionFilter("Any file (*.*)", "*.*"));
+			fd.getExtensionFilters().add(new ExtensionFilter("Text files (*.txt)", "*.txt"));
 			List<File> files = fd.showOpenMultipleDialog(primaryStage);
 
 			if(files == null){
@@ -111,8 +112,7 @@ public class NotesMain extends Application {
 			for(File fn : files){
 				try {
 					Tab tempTI = new Tab(fn.getName());
-					Note tempNote = new Note(fn.getAbsolutePath(), tempTI, tabs);
-					tempNote.start();
+					Note tempNote = new Note(fn, tempTI, tabs, primaryStage);
 					notes.add(tempNote);
 				} catch (IOException e1) {
 					Alert a = new Alert(AlertType.ERROR);
@@ -140,7 +140,11 @@ public class NotesMain extends Application {
 			//save the current note
 			int temp = tabs.getSelectionModel().getSelectedIndex();
 			if(temp == -1){return;}
-			notes.get(temp).saveAs();
+			FileChooser fd = new FileChooser();
+			fd.setTitle("Select the file(s) to open");
+			fd.getExtensionFilters().add(new ExtensionFilter("Text files (*.txt)", "*.txt"));
+			File f = fd.showSaveDialog(primaryStage);
+			notes.get(temp).saveAs(f.getAbsolutePath());
 		});
 
 		//file close
@@ -155,9 +159,9 @@ public class NotesMain extends Application {
 		fileMenuCloseAll.setOnAction(event -> {
 			for(Note n : notes){
 				//save the note if needed
-				if(n.needsSaved()){
+				if(n.getNeedsSaved()){
 					Alert a = new Alert(AlertType.NONE, "Do you want to save changes to: "
-							+ n.getName() + "?", ButtonType.YES, ButtonType.NO);
+							+ n.getFileName() + "?", ButtonType.YES, ButtonType.NO);
 					Optional<ButtonType> b = a.showAndWait();
 					if(b.isPresent() && b.get().getText().equals("Yes")){
 						n.save();
@@ -256,135 +260,76 @@ public class NotesMain extends Application {
 
 		bp.setCenter(tabs);
 
-
-		/*
-
-
-		tabFolder.addMouseListener(new MouseListener() {
-
-			@Override
-			public void mouseDoubleClick(MouseEvent e) {
-				// maybe do somthing later with this
-
-			}
-
-			@Override
-			public void mouseDown(MouseEvent e) {
-				//System.out.println(tabFolder.getSelection()[0].getText() + " selected");
-				if(tabFolder.getSelection()[0].equals(tiNew)){
-					TabItem tempTI = new TabItem(tabFolder, SWT.NONE);
-					Note tempNote = new Note(tempTI, tabFolder);
-					tempNote.start();
-					notes.add(tempNote);
-					tempTI.setText("New " + notes.size());
-					tabFolder.setSelection(tempTI);
-				}
-			}
-
-			@Override
-			public void mouseUp(MouseEvent e) {
-
-			}
-
-		});
-
-		shell.addControlListener(new ControlListener() {
-			@Override
-			public void controlMoved(ControlEvent e) {
-				//nothing needed to do here
-			}
-
-			@Override
-			public void controlResized(ControlEvent e) {
-				tabFolder.setSize(shell.getSize().x - 35, shell.getSize().y - 100);
-				lblBottom.setLocation(5, shell.getSize().y - 84);
-				lblBottom.setSize(shell.getSize().x, lblBottom.getSize().y);
-			}
-
-		});
-
-		lblBottom = new Label(shell, SWT.NONE);
-		lblBottom.setSize(500, 25);
-
-		lblBottom.setBounds(50, 600, 500, 25);
-		lblBottom.moveAbove(null);
-		lblBottom.setText("");
-		display.timerExec(100, new Runnable() {
-
+		Timer t = new Timer();
+		//update the status periodically
+		t.schedule(new TimerTask(){
 			@Override
 			public void run() {
-				if(shell.isDisposed()) return;
-				//System.out.println("Is reading to any: " + isReadingToAny());
 				String stats = getStatus();
-				lblBottom.setText(stats.equals("") ? "Ready" : stats);
-				display.timerExec(100, this);
+				Platform.runLater(() -> {
+					lblBottom.setText(stats.equals("") ? "Ready" : stats);
+				});				
 			}
-
-		});
-		shell.open();
-		System.out.println("Log: UI opened successfully.");
-		while(!shell.isDisposed()){
-			if(!display.readAndDispatch()){
-				display.sleep();
-			}
-		}
-		display.dispose();
-
-		shell = new Shell(display);
-		shell.setText("ZJ Notes");
-		shell.setSize(800, 600);
-	}
-
-	public static String getStatus() {
-		String retVal = "";
-		for(Note n : notes){
-			retVal += (n.getStatus() == "" ? "" : n.getStatus());
-		}
-		return retVal;
-	}
-
-	public static boolean isReadingToAny() {
-		for(Note n : notes){
-			if(n.getIsReading()){
-				return true;
-			}
-		}
-		return false;
-		 */
-
+		}, 0, 1000);
+		
 		Scene scene = new Scene(bp);
 		primaryStage.setScene(scene);
 		primaryStage.setTitle("Notes");
+		primaryStage.setWidth(600);
+		primaryStage.setHeight(400);
 
-		//add the close save prompt
-
+		//prompt for the save when all tabs are closed
 		primaryStage.setOnCloseRequest(event -> {
-			//TODO
+			//just fire the fileMenuClose
+			fileMenuCloseAll.fire();
+			//cancel the timer
+			t.cancel();
 		});
 		primaryStage.show();
 
 	}
 
 	/**
+	 * Gets the combined status of all the notes.
+	 * @return A string concatenation of the statuses for each note.
+	 */
+	public String getStatus() {
+		String retVal = "";
+		for(Note n : notes){
+			retVal += n.getStatus();
+		}
+		return retVal;
+	}
+
+	/** Returns true if any of the notes are being read. */
+	public boolean isReadingToAny() {
+		for(Note n : notes){
+			if(n.getIsReading()){
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Closes the selected tab
 	 */
 	private void closeSelected(){
-		// TODO
 		int index = tabs.getSelectionModel().getSelectedIndex();
-		if(index > 1){
+		if(index >= 0){
 			//get the selected tab
 			Tab temp = tabs.getTabs().get(index);
 			//close it
-			Note n = notes.get(index - 1);
-			if(n.needsSaved()){
+			Note n = notes.get(index);
+			if(n.getNeedsSaved()){
 				Alert a = new Alert(AlertType.NONE, "Do you want to save changes to: "
-						+ n.getName() + "?", ButtonType.YES, ButtonType.NO);
+						+ n.getFileName() + "?", ButtonType.YES, ButtonType.NO);
 				Optional<ButtonType> b = a.showAndWait();
 				if(b.isPresent() && b.get().getText().equals("Yes")){
 					n.save();
 				}
 			}
-			notes.remove(index - 1);
+			notes.remove(index);
 			tabs.getTabs().remove(temp);
 		}
 	}
