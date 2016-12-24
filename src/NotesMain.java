@@ -55,22 +55,6 @@ public class NotesMain extends Application {
 		System.out.println("Closing this command line window will terminate this process immediately and can cause you to lose unsaved progress");
 
 		Application.launch(args);
-		//TODO
-		/*
-		Add more options with the dictionary (change local definitions, add user-defined definitions)
-		Add the ability to add names to dictionary
-		add the option to export/import definitions to/from 1 file
-
-
-		keep a recents list
-		if a tab is still open when the application shuts down, re-open it (if the filename is available) when the application starts
-
-		Add more edit options to find, find & replace -use parameters like whole words only, case sensitive, current selection/current document/all open documents
-			-also add the option to iterate (only go one occurrence at a time) - add the required buttons to the existing UI
-			-for the not case sensitive-make a string = txt.getText() and set that and the find string to lower
-
-		 */
-
 		System.out.println("Log: main thread shut down normally @ " + new Date().toString());
 	}
 	
@@ -142,7 +126,7 @@ public class NotesMain extends Application {
 		fileMenuNew.setOnAction(event -> {
 			FileChooser fd = new FileChooser();
 			fd.setTitle("Select the file(s) to open");
-			fd.getExtensionFilters().add(new ExtensionFilter("Any file (*.*)", "*.*"));
+			fd.getExtensionFilters().add(new ExtensionFilter("Text files (*.txt)", "*.txt"));
 			File file = fd.showSaveDialog(primaryStage);
 			
 			if(file == null){
@@ -180,6 +164,7 @@ public class NotesMain extends Application {
 				try {
 					Tab tempTI = new Tab(fn.getName());
 					Note tempNote = new Note(fn, tempTI, tabs, primaryStage, definitions);
+					tabs.getTabs().add(tempTI);
 					notes.add(tempNote);
 				} catch (IOException e1) {
 					Alert a = new Alert(AlertType.ERROR);
