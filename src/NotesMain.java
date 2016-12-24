@@ -1,7 +1,13 @@
+import java.io.EOFException;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Timer;
@@ -9,12 +15,6 @@ import java.util.TimerTask;
 
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.scene.control.MenuBar;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.Tab;
-import javafx.scene.control.TabPane;
-import javafx.scene.input.MouseButton;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
@@ -22,6 +22,12 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.scene.input.MouseButton;
+import javafx.scene.layout.BorderPane;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Stage;
@@ -33,14 +39,19 @@ public class NotesMain extends Application {
 	private TabPane tabs;
 	/** This is the label that displays the message at the bottom*/
 	private Label lblBottom;
+	/**
+	 * This is the map of String, Definition that is the word, and it's corresponding definition.
+	 * The get, put, and contains methods are constant time
+	 */
+	private HashMap<String, Definition> definitions = new HashMap<String, Definition>();
 
 	public static final String base = thisBaseDir();
-	public final static String defDir = base + "definitions" + File.separator;
+	public final static String defFile = base + "definitions.defnar";
 
 	public static void main(String[] args) {
 		System.out.println("Log: Notes process started in main (UI thread) @ " + new Date().toString());
 		System.out.println("Log: Base directory : " + base);
-		System.out.println("Log: Definitions directory : " + defDir);
+		System.out.println("Log: Definitions file : " + defFile);
 		System.out.println("Closing this command line window will terminate this process immediately and can cause you to lose unsaved progress");
 
 		Application.launch(args);
@@ -61,6 +72,62 @@ public class NotesMain extends Application {
 		 */
 
 		System.out.println("Log: main thread shut down normally @ " + new Date().toString());
+	}
+	
+	@Override
+	public void init(){
+		//load in the definitions
+		//the definitions are all serialized to the definitions file
+		FileInputStream fis = null;
+		ObjectInputStream ois = null;
+		try {
+			fis = new FileInputStream(defFile);
+			ois = new ObjectInputStream(fis);
+			while(true){
+				Definition d = (Definition)ois.readObject();
+				this.definitions.put(d.getWord(), d);
+			}
+		} catch (EOFException e){
+			//don't need to do anything, end of file reached.
+			//this part of code will be run once the definitions are all loaded.
+		} catch (ClassNotFoundException | IOException e) {
+			System.out.println("Error: " + e.getMessage());
+		} finally {
+			try {
+				if(ois != null) { ois.close(); }
+				if(fis != null) { fis.close(); }
+			} catch (IOException e) {
+				System.out.println("Error: " + e.getMessage());
+			}
+		
+		}
+		
+	}
+	
+	/**
+	 * Saves the definitions to file
+	 */
+	private void saveDefinitions(){
+		//save the definitions to file
+		FileOutputStream fos = null;
+		ObjectOutputStream oos = null;
+		try{
+			fos = new FileOutputStream(defFile);
+			oos = new ObjectOutputStream(fos);
+			for( Definition d : this.definitions.values()){
+				oos.writeObject(d);
+			}
+		} catch (IOException e){
+			System.out.println("Error: " + e.getMessage());
+		} finally {
+			try {
+				if(oos != null) { oos.close(); }
+				if(fos != null) { fos.close(); }
+			} catch (IOException e) {
+				System.out.println("Error: " + e.getMessage());
+			}
+		}
+		
 	}
 
 	@Override
@@ -84,7 +151,7 @@ public class NotesMain extends Application {
 			try {
 				file.createNewFile();
 				Tab tempTI = new Tab(file.getName());
-				Note tempNote = new Note(file, tempTI, tabs, primaryStage);
+				Note tempNote = new Note(file, tempTI, tabs, primaryStage, definitions);
 				notes.add(tempNote);
 				tabs.getTabs().add(tempTI);
 			} catch (IOException e1) {
@@ -112,7 +179,7 @@ public class NotesMain extends Application {
 			for(File fn : files){
 				try {
 					Tab tempTI = new Tab(fn.getName());
-					Note tempNote = new Note(fn, tempTI, tabs, primaryStage);
+					Note tempNote = new Note(fn, tempTI, tabs, primaryStage, definitions);
 					notes.add(tempNote);
 				} catch (IOException e1) {
 					Alert a = new Alert(AlertType.ERROR);
@@ -210,27 +277,10 @@ public class NotesMain extends Application {
 		//define word
 		MenuItem defMenuDefine = new MenuItem("Define word");
 		defMenuDefine.setOnAction(event -> {
-			//TODO
-			Definition.defineWord();
+			DefinitionShower ds = new DefinitionShower(this.definitions);
+			ds.show(primaryStage);
 		});
 		defMenu.getItems().add(defMenuDefine);
-
-		//create archive
-		MenuItem defMenuCreateArchive = new MenuItem("Create Archive");
-		defMenuCreateArchive.setOnAction(event -> {
-			//TODO
-			Definition.createDefArchive();
-		});
-		defMenu.getItems().add(defMenuCreateArchive);
-
-		//load archive
-		MenuItem defMenuLoadArchive = new MenuItem("Load Archive");
-		defMenuLoadArchive.setOnAction(event -> {
-			//TODO
-			Definition.loadArchive();
-		});
-		defMenu.getItems().add(defMenuLoadArchive);
-
 
 		menu.getMenus().addAll(fileMenu, editMenu, defMenu);
 
@@ -284,6 +334,8 @@ public class NotesMain extends Application {
 			fileMenuCloseAll.fire();
 			//cancel the timer
 			t.cancel();
+			//save the definitions
+			this.saveDefinitions();
 		});
 		primaryStage.show();
 

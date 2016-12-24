@@ -3,8 +3,9 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -53,8 +54,13 @@ public class Note{
 	private boolean needsSaved = false;
 	/** The text of this note */
 	private String text = "";
-	
-	private ArrayList<String> wordsNotInDict = new ArrayList<String>();
+	/** Holds the words in this note that are not in the dictionary.
+	 * This is used so that misspelled words are not tried to define more than once. */
+	private HashSet<String> wordsNotInDict = new HashSet<String>();
+	/**
+	 * Holds the reference to the definitions.
+	 */
+	private HashMap<String, Definition> definitions;
 
 	/**
 	 * Constructor for a note that is from an existing file.
@@ -62,10 +68,13 @@ public class Note{
 	 * @param ti The Tab on the UI
 	 * @param tf The TabPane on the UI
 	 * @param primaryStage The window to show alerts on.
+	 * @param definitions the definitions in the main program.
 	 * @throws IOException This will throw an IOException if there is an error 
 	 * in creating the FileReader, BufferedReader, or if there is an issue decoding the file.
 	 */
-	public Note(File file, Tab ti, TabPane tf, Stage primaryStage) throws IOException{
+	public Note(File file, Tab ti, TabPane tf, Stage primaryStage, 
+			HashMap<String, Definition> definitions) throws IOException{
+		
 		System.out.println("Log: " + fileName + " file opened @" + new Date().toString());
 		this.totLength = new File(fileName).length();
 		this.currentRead = 0L;
@@ -75,6 +84,7 @@ public class Note{
 		this.ti = ti;
 		this.tf = tf;
 		this.primaryStage = primaryStage;
+		this.definitions = definitions;
 		setStyledText();
 		new Thread(() -> {
 			System.out.println("Log: " + getFileName() + " note thread started @" + new Date());
@@ -142,17 +152,16 @@ public class Note{
 				}
 				currentWord = currentWord.replace("'s", ""); //remove the possessives
 
-				//TODO - make this use the definitions from NotesMain instead of files.
 				//process the current word
-				File newFile = new File(NotesMain.defDir + currentWord + ".txt");
-				if(!newFile.exists()){ 
+				if(!this.definitions.containsKey(currentWord)){ 
 					//if there is not a dictionary entry for word and if it is 
 					//not a roman numeral then it is misspelled
 					if(!Definition.isRomanNumeral(currentWord)){
 						//try to define the word
 						if(!wordsNotInDict.contains(currentWord)){
 							try {
-								Definition.defineWord(currentWord);
+								Definition d = new Definition(currentWord);
+								this.definitions.put(d.getWord(), d);
 							} catch (Exception e) {
 								System.out.println("Could not define word: " + currentWord);
 								wordsNotInDict.add(currentWord);
@@ -174,8 +183,9 @@ public class Note{
 	 * @param ti The TabItem on the UI
 	 * @param tf The TabFolder on the UI
 	 */
-	public Note(Tab ti, TabPane tf, Stage primaryStage){
+	public Note(Tab ti, TabPane tf, Stage primaryStage, HashMap<String, Definition> definitions){
 		System.out.println("Log: new note started @" + new Date().toString());
+		this.definitions = definitions;
 		this.ti = ti;
 		this.tf = tf;
 		this.primaryStage = primaryStage;
@@ -369,7 +379,6 @@ public class Note{
 	 * @param showCount to show an alert displaying the number of misspelled words.
 	 */
 	public void checkSpelling(int start, int end, boolean showCount){
-		//TODO - make this go from start to end only
 		//check spelling
 		int spellingIndex = txt.getSelection().getStart();
 
@@ -392,18 +401,27 @@ public class Note{
 			}
 			currentWord = currentWord.replace("'s", ""); //remove the possessives
 			//process the current word
-			//TODO - replace with a dictionary of string word, string definition
-			File newFile = new File(NotesMain.defDir + currentWord + ".txt");
-			if(!newFile.exists()){ 
-				//if there is not a dictionary entry for word and if 
-				//it is not a roman numeral then it is misspelled
+			if(!this.definitions.containsKey(currentWord)){ 
+				//if there is not a dictionary entry for word and if it is 
+				//not a roman numeral then it is misspelled
+				
+				//TODO select the word
+				//txt.setSelectionRange(i, currentWord.length());
+				//fgColor(display.getSystemColor(SWT.COLOR_RED));
+				
 				if(!Definition.isRomanNumeral(currentWord)){
-					//TODO - select the word
-					System.out.println(currentWord + " is misspelled.");
-					//txt.setSelectionRange(i, currentWord.length());
-					//fgColor(display.getSystemColor(SWT.COLOR_RED));
-					numMissed ++;
+					//try to define the word
+					if(!wordsNotInDict.contains(currentWord)){
+						try {
+							Definition d = new Definition(currentWord);
+							this.definitions.put(d.getWord(), d);
+						} catch (Exception e) {
+							System.out.println("Could not define word: " + currentWord);
+							wordsNotInDict.add(currentWord);
+						}
+					}
 				}
+				numMissed++;
 			}
 			//add on the length of the current word so that "you" won't be "you","ou","u"
 			i += currentWord.length(); 
