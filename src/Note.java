@@ -76,7 +76,7 @@ public class Note{
 			HashMap<String, Definition> definitions) throws IOException{
 		
 		System.out.println("Log: " + fileName + " file opened @" + new Date().toString());
-		this.totLength = new File(fileName).length();
+		this.totLength = file.length();
 		this.currentRead = 0L;
 		//use multithreading to load from a file as it could potentially be very large
 		this.fileName = file.getAbsolutePath();
