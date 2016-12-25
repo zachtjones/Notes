@@ -207,6 +207,7 @@ public class NotesMain extends Application {
 		});
 		fileMenu.getItems().add(fileMenuClose);
 
+		//file close all
 		MenuItem fileMenuCloseAll = new MenuItem("Close all");
 		fileMenuCloseAll.setOnAction(event -> {
 			for(Note n : notes){
@@ -221,8 +222,9 @@ public class NotesMain extends Application {
 				}
 			}
 			//remove all notes
-			notes.removeAll(notes);
+			notes.clear();
 			tabs.getTabs().clear();
+			
 		});
 		fileMenu.getItems().add(fileMenuCloseAll);
 
@@ -277,6 +279,8 @@ public class NotesMain extends Application {
 		lblBottom = new Label();
 		bp.setBottom(lblBottom);
 
+		//the tab folder
+		tabs = new TabPane();
 		bp.setCenter(tabs);
 
 		Timer t = new Timer();
