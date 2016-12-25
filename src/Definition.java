@@ -19,7 +19,7 @@ public class Definition implements Comparable<Definition>, Serializable {
 	 * no netword connection, or any other I/O error.
 	 */
 	public Definition(String word) throws IOException {
-		this.word = word;
+		this.word = word.toLowerCase();
 		this.definition = defineWord(word);
 	}
 	

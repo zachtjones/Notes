@@ -1,6 +1,8 @@
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.Date;
@@ -11,7 +13,6 @@ import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Tab;
-import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
@@ -36,8 +37,6 @@ public class Note{
 	private String shortName;
 	/** The tab for this note */
 	private Tab ti;
-	/** The tab pane for this note */
-	private TabPane tf;
 	/** The text area for this note */
 	private TextArea txt;
 	/** The total length of bytes to read */
@@ -46,8 +45,6 @@ public class Note{
 	private long currentRead = 0;
 	/** Whether or not this note is reading */
 	private boolean isReading = false;
-	
-	private SaveThread st;
 	/** The primary stage for this program. */
 	private Stage primaryStage;
 	/** Whether or not there are usaved changes to this note. */
@@ -66,23 +63,21 @@ public class Note{
 	 * Constructor for a note that is from an existing file.
 	 * @param file The File representing the file of this note
 	 * @param ti The Tab on the UI
-	 * @param tf The TabPane on the UI
 	 * @param primaryStage The window to show alerts on.
 	 * @param definitions the definitions in the main program.
 	 * @throws IOException This will throw an IOException if there is an error 
 	 * in creating the FileReader, BufferedReader, or if there is an issue decoding the file.
 	 */
-	public Note(File file, Tab ti, TabPane tf, Stage primaryStage, 
+	public Note(File file, Tab ti, Stage primaryStage, 
 			HashMap<String, Definition> definitions) throws IOException{
 		
-		System.out.println("Log: " + fileName + " file opened @" + new Date().toString());
+		System.out.println("Log: " + file.getName() + " file opened @" + new Date().toString());
 		this.totLength = file.length();
 		this.currentRead = 0L;
 		//use multithreading to load from a file as it could potentially be very large
 		this.fileName = file.getAbsolutePath();
 		this.shortName = file.getName();
 		this.ti = ti;
-		this.tf = tf;
 		this.primaryStage = primaryStage;
 		this.definitions = definitions;
 		setStyledText();
@@ -152,8 +147,8 @@ public class Note{
 				}
 				currentWord = currentWord.replace("'s", ""); //remove the possessives
 
-				//process the current word
-				if(!this.definitions.containsKey(currentWord)){ 
+				//process the current word - only the lower case is stored
+				if(!this.definitions.containsKey(currentWord.toLowerCase())){ 
 					//if there is not a dictionary entry for word and if it is 
 					//not a roman numeral then it is misspelled
 					if(!Definition.isRomanNumeral(currentWord)){
@@ -181,13 +176,11 @@ public class Note{
 	 * Constructor for a note that is newly created (not from an existing file). 
 	 * You <b><u>MUST</b></u> call the run method of this object in order to add dictionary items.
 	 * @param ti The TabItem on the UI
-	 * @param tf The TabFolder on the UI
 	 */
-	public Note(Tab ti, TabPane tf, Stage primaryStage, HashMap<String, Definition> definitions){
+	public Note(Tab ti, Stage primaryStage, HashMap<String, Definition> definitions){
 		System.out.println("Log: new note started @" + new Date().toString());
 		this.definitions = definitions;
 		this.ti = ti;
-		this.tf = tf;
 		this.primaryStage = primaryStage;
 		setStyledText();
 	}
@@ -239,7 +232,8 @@ public class Note{
 		return this.ti;
 	}
 	/**
-	 * Saves the note to file. If the note was created using the + tab, then this calls the saveAs method
+	 * Saves the note to file. If the note was created using the file -> new, 
+	 * then this calls the saveAs method
 	 * @return true if the file saves properly, otherwise false
 	 * @see Note.saveAs
 	 */
@@ -253,11 +247,8 @@ public class Note{
 			saveAs(f.getAbsolutePath());
 			return;
 		}
-		this.needsSaved = false;
-		//save to the fileName using mutilthreads
-		st = new SaveThread(text, fileName, ti, tf);
-		st.start();
-		this.ti.setText(shortName);
+		//just save to the filename
+		saveAs(this.fileName);
 	}
 	/**
 	 * Saves the note to the file specified. 
@@ -268,11 +259,27 @@ public class Note{
 	 */
 	public void saveAs(String filename){
 		this.fileName = filename;
+		this.shortName = new File(filename).getName();
 		this.needsSaved = false;
 		//save to the fileName using mutilthreads
-		st = new SaveThread(text, this.fileName, ti, tf);
-		st.start();
-		this.ti.setText(shortName);
+		new Thread(() -> {
+			try {
+				FileWriter fw = new FileWriter(this.fileName);
+				BufferedWriter bw = new BufferedWriter(fw);
+				bw.write(this.text);
+				bw.flush();
+				bw.close();
+				fw.close();
+				Platform.runLater(() -> {
+					this.ti.setText(shortName);
+				});
+			} catch (IOException e){
+				Alert a = new Alert(AlertType.ERROR);
+				a.setTitle("Error");
+				a.setContentText("There was an error saving the file.\nMessage: " + e.getMessage());
+			}
+			
+		}).start();
 	}
 	
 	/**
@@ -285,6 +292,7 @@ public class Note{
 		ti.setContent(txt);
 
 		txt.setOnKeyPressed(event -> {
+			text = txt.getText();
 			if(event.getCode() == KeyCode.TAB){
 				System.out.println("Tab pressed");
 				//consume so that the tab character is not inserted
@@ -294,10 +302,6 @@ public class Note{
 				setTab(event);
 				//since this changes the note, update
 				this.needsSaved();
-				
-				//check the spelling near the selection if a space was pressed
-			} else if(event.getCode() == KeyCode.SPACE){
-				checkSpellingNearSelection();
 				
 				//use Ctrl (windows) or command (mac os) combinations
 			} else if(event.isShortcutDown()){ 
@@ -312,6 +316,7 @@ public class Note{
 
 			} else {
 				//the text is edited
+				this.text = txt.getText();
 				this.needsSaved();
 			}
 		});
@@ -400,8 +405,8 @@ public class Note{
 
 			}
 			currentWord = currentWord.replace("'s", ""); //remove the possessives
-			//process the current word
-			if(!this.definitions.containsKey(currentWord)){ 
+			//process the current word - the lower case is stored
+			if(!this.definitions.containsKey(currentWord.toLowerCase())){ 
 				//if there is not a dictionary entry for word and if it is 
 				//not a roman numeral then it is misspelled
 				
@@ -429,44 +434,20 @@ public class Note{
 
 		//done, so set the selection back, and show alert
 		txt.positionCaret(spellingIndex);
-		Alert a = new Alert(AlertType.NONE);
-		a.setTitle("Spell check");
-		a.setContentText("Completed spell checking and found " + numMissed + " misspelled words");
-		a.showAndWait();
+		if(showCount){
+			Alert a = new Alert(AlertType.INFORMATION);
+			a.setTitle("Spell check");
+			a.setContentText("Completed spell checking and found " + numMissed + " misspelled words");
+			a.showAndWait();
+		}
+		
 	}
-
-
 	
 	/**
 	 * Call this method to check the spelling of this note. 
-	 * This highlights all words in red that are not spelled correctly.
 	 */
 	public void checkSpelling() {
 		checkSpelling(0, txt.getText().length(), true);
-	}
-	
-	/**
-	 * Call this method to check the spelling of this note within 100 chars of the cursor position.
-	 *  This method is faster than checking the whole note. 
-	 *  This highlights all words in red that are not spelled correctly
-	 */
-	private void checkSpellingNearSelection(){
-		int originalPos = txt.getCaretPosition();
-		int start = originalPos - 100;
-		int end = originalPos + 100;
-		if(start < 0){ start = 0; }
-		if(end > txt.getText().length()) { end = txt.getText().length(); }
-		//move the start to a whole word
-		txt.positionCaret(start);
-		txt.selectNextWord();
-		start = txt.getCaretPosition();
-		//move the end to a whole word
-		txt.positionCaret(end);
-		txt.selectPreviousWord();
-		end = txt.getCaretPosition();
-		checkSpelling(start, end, false);
-		//move caret back
-		txt.positionCaret(originalPos);
 	}
 
 	/**
@@ -500,10 +481,6 @@ public class Note{
 			DecimalFormat df = new DecimalFormat("##.##");
 			s = "Reading file: " + new File(fileName).getName() + " " 
 					+ df.format(100*(double)currentRead/(double)totLength) + "%";
-		}
-		if(st == null) return s;
-		if(st.getState() != Thread.State.TERMINATED){
-			s += st.getStatus();
 		}
 		return s;
 	}

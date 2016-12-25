@@ -19,14 +19,12 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ButtonType;
-import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
-import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
@@ -135,7 +133,7 @@ public class NotesMain extends Application {
 			try {
 				file.createNewFile();
 				Tab tempTI = new Tab(file.getName());
-				Note tempNote = new Note(file, tempTI, tabs, primaryStage, definitions);
+				Note tempNote = new Note(file, tempTI, primaryStage, definitions);
 				notes.add(tempNote);
 				tabs.getTabs().add(tempTI);
 			} catch (IOException e1) {
@@ -163,7 +161,7 @@ public class NotesMain extends Application {
 			for(File fn : files){
 				try {
 					Tab tempTI = new Tab(fn.getName());
-					Note tempNote = new Note(fn, tempTI, tabs, primaryStage, definitions);
+					Note tempNote = new Note(fn, tempTI, primaryStage, definitions);
 					tabs.getTabs().add(tempTI);
 					notes.add(tempNote);
 				} catch (IOException e1) {
@@ -196,8 +194,10 @@ public class NotesMain extends Application {
 			fd.setTitle("Select the file(s) to open");
 			fd.getExtensionFilters().add(new ExtensionFilter("Text files (*.txt)", "*.txt"));
 			File f = fd.showSaveDialog(primaryStage);
+			if(f == null) { return; } //no file selected
 			notes.get(temp).saveAs(f.getAbsolutePath());
 		});
+		fileMenu.getItems().add(fileMenuSaveAs);
 
 		//file close
 		MenuItem fileMenuClose = new MenuItem("Close");
@@ -224,6 +224,7 @@ public class NotesMain extends Application {
 			notes.removeAll(notes);
 			tabs.getTabs().clear();
 		});
+		fileMenu.getItems().add(fileMenuCloseAll);
 
 		//edit menu
 		Menu editMenu = new Menu("Edit");
@@ -260,7 +261,7 @@ public class NotesMain extends Application {
 		Menu defMenu = new Menu("Definitions");
 
 		//define word
-		MenuItem defMenuDefine = new MenuItem("Define word");
+		MenuItem defMenuDefine = new MenuItem("Defined words");
 		defMenuDefine.setOnAction(event -> {
 			DefinitionShower ds = new DefinitionShower(this.definitions);
 			ds.show(primaryStage);
@@ -275,23 +276,6 @@ public class NotesMain extends Application {
 		//bottom label
 		lblBottom = new Label();
 		bp.setBottom(lblBottom);
-
-		//the close context-menu
-		ContextMenu cm = new ContextMenu();
-		MenuItem close = new MenuItem("Close");
-		close.setOnAction(event -> {
-			closeSelected();
-		});
-		cm.getItems().add(close);
-
-		//the tab pane
-		tabs = new TabPane();
-		tabs.setOnMouseClicked(event -> {
-			if(event.getButton() == MouseButton.SECONDARY){
-				//show close context menu
-				cm.show(primaryStage);
-			}
-		});
 
 		bp.setCenter(tabs);
 
