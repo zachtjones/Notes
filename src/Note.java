@@ -8,6 +8,7 @@ import java.text.DecimalFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Optional;
 
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -15,6 +16,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
@@ -22,6 +24,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.IndexRange;
 import javafx.scene.control.Label;
 import javafx.stage.FileChooser;
@@ -383,24 +386,21 @@ public class Note{
 	 * @param end The end index (must be > start and < txt.getText().length()
 	 * @param showCount to show an alert displaying the number of misspelled words.
 	 */
-	public void checkSpelling(int start, int end, boolean showCount){
+	public void checkSpelling(){
 		//check spelling
 		int spellingIndex = txt.getSelection().getStart();
 
-		int numMissed = 0;
-
-		String t = txt.getText();
-		for(int i = start; i < end; i++){//loop through every character
-			if(CONTROL_CHARS.contains("" + t.charAt(i))){
+		for(int i = 0; i < txt.getText().length(); i++){//loop through every character
+			if(CONTROL_CHARS.contains(txt.getText(i, i + 1))){
 				continue; //go on to the next letter
 			}
 			String currentWord = "";
-			for(int j = i; j < t.length(); j++){
+			for(int j = i; j < txt.getText().length(); j++){
 				//go until a control char is reached
-				if(CONTROL_CHARS.contains("" + t.charAt(j))){
+				if(CONTROL_CHARS.contains(txt.getText(j, j + 1))){
 					break;
 				} else {
-					currentWord += t.charAt(j);
+					currentWord += txt.getText(j, j + 1);
 				}
 
 			}
@@ -409,13 +409,9 @@ public class Note{
 			if(!this.definitions.containsKey(currentWord.toLowerCase())){ 
 				//if there is not a dictionary entry for word and if it is 
 				//not a roman numeral then it is misspelled
-				
-				//TODO select the word
-				//txt.setSelectionRange(i, currentWord.length());
-				//fgColor(display.getSystemColor(SWT.COLOR_RED));
-				
 				if(!Definition.isRomanNumeral(currentWord)){
 					//try to define the word
+					boolean showAlert = false;
 					if(!wordsNotInDict.contains(currentWord)){
 						try {
 							Definition d = new Definition(currentWord);
@@ -423,10 +419,35 @@ public class Note{
 						} catch (Exception e) {
 							System.out.println("Could not define word: " + currentWord);
 							wordsNotInDict.add(currentWord);
+							//also not a word
+							txt.selectRange(i + currentWord.length(), i);
+							showAlert = true;
 						}
+					} else {
+						//definitely not a word
+						txt.selectRange(i + currentWord.length(), i);
+						showAlert = true;
 					}
+					if(showAlert){
+						Alert a = new Alert(AlertType.NONE, "Do you wish to edit word: "
+							+ currentWord + "?", new ButtonType("Yes"), new ButtonType("No"));
+						Optional<ButtonType> b = a.showAndWait();
+						if(b.isPresent() && b.get().getText().equals("Yes")){
+							//change the text to the input
+							TextInputDialog tid = new TextInputDialog(currentWord);
+							tid.setGraphic(null);
+							tid.setContentText("Enter the new word: ");
+							Optional<String> value = tid.showAndWait();
+							if(value.isPresent()){
+								txt.deleteText(i, i + currentWord.length());
+								txt.insertText(i, value.get());
+							}
+							this.text = txt.getText();
+						}
+						
+					}
+					
 				}
-				numMissed++;
 			}
 			//add on the length of the current word so that "you" won't be "you","ou","u"
 			i += currentWord.length(); 
@@ -434,20 +455,7 @@ public class Note{
 
 		//done, so set the selection back, and show alert
 		txt.positionCaret(spellingIndex);
-		if(showCount){
-			Alert a = new Alert(AlertType.INFORMATION);
-			a.setTitle("Spell check");
-			a.setContentText("Completed spell checking and found " + numMissed + " misspelled words");
-			a.showAndWait();
-		}
 		
-	}
-	
-	/**
-	 * Call this method to check the spelling of this note. 
-	 */
-	public void checkSpelling() {
-		checkSpelling(0, txt.getText().length(), true);
 	}
 
 	/**
